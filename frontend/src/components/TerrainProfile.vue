@@ -68,6 +68,41 @@ function draw() {
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  const safeDistance = store.droneConfig.safeDistance;
+
+  // Draw safe distance line (dashed)
+  ctx.beginPath();
+  ctx.setLineDash([5, 4]);
+  ctx.moveTo(toX(distances[0]), toY(profile[0].terrainElevation + safeDistance));
+  for (let i = 1; i < profile.length; i++) {
+    ctx.lineTo(toX(distances[i]), toY(profile[i].terrainElevation + safeDistance));
+  }
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw risk areas (red fill where flight altitude < terrain + safeDistance)
+  for (let i = 0; i < profile.length - 1; i++) {
+    const p0 = profile[i];
+    const p1 = profile[i + 1];
+    const safe0 = p0.terrainElevation + safeDistance;
+    const safe1 = p1.terrainElevation + safeDistance;
+    const alt0 = p0.altitude;
+    const alt1 = p1.altitude;
+
+    if (alt0 < safe0 || alt1 < safe1) {
+      ctx.beginPath();
+      ctx.moveTo(toX(distances[i]), toY(Math.max(alt0, safe0)));
+      ctx.lineTo(toX(distances[i + 1]), toY(Math.max(alt1, safe1)));
+      ctx.lineTo(toX(distances[i + 1]), toY(safe1));
+      ctx.lineTo(toX(distances[i]), toY(safe0));
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(239,68,68,0.35)';
+      ctx.fill();
+    }
+  }
+
   // Draw safe distance gap (green shading)
   ctx.beginPath();
   ctx.moveTo(toX(distances[0]), toY(profile[0].terrainElevation));
@@ -78,7 +113,7 @@ function draw() {
     ctx.lineTo(toX(distances[i]), toY(profile[i].altitude));
   }
   ctx.closePath();
-  ctx.fillStyle = 'rgba(34,197,94,0.1)';
+  ctx.fillStyle = 'rgba(34,197,94,0.08)';
   ctx.fill();
 
   // Draw flight path
@@ -87,7 +122,8 @@ function draw() {
   for (let i = 1; i < profile.length; i++) {
     ctx.lineTo(toX(distances[i]), toY(profile[i].altitude));
   }
-  ctx.strokeStyle = '#3b82f6';
+  const hasTerrainRisk = profile.some((p) => p.altitude < p.terrainElevation + safeDistance);
+  ctx.strokeStyle = hasTerrainRisk ? '#ef4444' : '#3b82f6';
   ctx.lineWidth = 2;
   ctx.stroke();
 
@@ -143,7 +179,7 @@ function draw() {
 
   // Legend
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#3b82f6';
+  ctx.fillStyle = hasTerrainRisk ? '#ef4444' : '#3b82f6';
   ctx.fillRect(padding.left + 10, padding.top + 4, 12, 3);
   ctx.fillStyle = '#94a3b8';
   ctx.fillText('飞行高度', padding.left + 26, padding.top + 10);
@@ -151,10 +187,21 @@ function draw() {
   ctx.fillRect(padding.left + 90, padding.top + 2, 12, 8);
   ctx.fillStyle = '#94a3b8';
   ctx.fillText('地形', padding.left + 106, padding.top + 10);
+  ctx.setLineDash([3, 3]);
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(padding.left + 140, padding.top + 5);
+  ctx.lineTo(padding.left + 152, padding.top + 5);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillText('安全线', padding.left + 156, padding.top + 10);
 }
 
 onMounted(() => nextTick(draw));
 watch(() => store.terrainProfile, draw, { deep: true });
+watch(() => store.droneConfig.safeDistance, draw);
 </script>
 
 <template>

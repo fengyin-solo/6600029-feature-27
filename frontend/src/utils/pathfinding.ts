@@ -29,7 +29,8 @@ export function aStarPathfind(
   goal: [number, number],
   gridSize: number,
   noFlyZones: NoFlyZone[],
-  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }
+  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number },
+  safeDistance = 30
 ): Waypoint[] {
   const { minLat, maxLat, minLng, maxLng } = bounds;
   const rows = gridSize;
@@ -40,7 +41,7 @@ export function aStarPathfind(
   const isBlocked = (lat: number, lng: number): boolean => {
     for (const zone of noFlyZones) {
       const d = haversine(lat, lng, zone.center[0], zone.center[1]);
-      if (d < zone.radius) return true;
+      if (d < zone.radius + safeDistance) return true;
     }
     return false;
   };
@@ -145,7 +146,8 @@ export function rrtPathfind(
   start: [number, number],
   goal: [number, number],
   noFlyZones: NoFlyZone[],
-  maxIter = 500
+  maxIter = 500,
+  safeDistance = 30
 ): Waypoint[] {
   interface RRTNode {
     lat: number;
@@ -155,7 +157,7 @@ export function rrtPathfind(
 
   const isCollision = (lat: number, lng: number): boolean => {
     for (const zone of noFlyZones) {
-      if (haversine(lat, lng, zone.center[0], zone.center[1]) < zone.radius) return true;
+      if (haversine(lat, lng, zone.center[0], zone.center[1]) < zone.radius + safeDistance) return true;
     }
     return false;
   };
@@ -373,6 +375,59 @@ export const mockNoFlyZones: NoFlyZone[] = [
   },
 ];
 
+// ─── Route Risk Assessment ──────────────────────────────────────────────────
+export interface RouteRisk {
+  overallRisk: 'safe' | 'warning' | 'danger';
+  minDistanceToZone: number;
+  terrainRiskCount: number;
+  zoneRiskCount: number;
+}
+
+export function assessRouteRisk(
+  waypoints: Waypoint[],
+  noFlyZones: NoFlyZone[],
+  terrain: TerrainPoint[],
+  safeDistance: number
+): RouteRisk {
+  let minDistanceToZone = Infinity;
+  let zoneRiskCount = 0;
+  let terrainRiskCount = 0;
+
+  for (const wp of waypoints) {
+    for (const zone of noFlyZones) {
+      const d = haversine(wp.lat, wp.lng, zone.center[0], zone.center[1]) - zone.radius;
+      if (d < minDistanceToZone) minDistanceToZone = d;
+      if (d < safeDistance) zoneRiskCount++;
+    }
+  }
+
+  for (const wp of waypoints) {
+    let nearestElev = 0;
+    let minDist = Infinity;
+    for (const tp of terrain) {
+      const d = haversine(wp.lat, wp.lng, tp.lat, tp.lng);
+      if (d < minDist) {
+        minDist = d;
+        nearestElev = tp.elevation;
+      }
+    }
+    const clearance = wp.altitude - nearestElev;
+    if (clearance < safeDistance) terrainRiskCount++;
+  }
+
+  let overallRisk: RouteRisk['overallRisk'] = 'safe';
+  if (zoneRiskCount > 0 || terrainRiskCount > 0) overallRisk = 'warning';
+  if (minDistanceToZone < 0 || terrainRiskCount > waypoints.length * 0.3) overallRisk = 'danger';
+
+  return {
+    overallRisk,
+    minDistanceToZone: Math.max(0, minDistanceToZone),
+    terrainRiskCount,
+    zoneRiskCount,
+  };
+}
+
+// ─── Mock Data ──────────────────────────────────────────────────────────────
 export const mockTerrainData: TerrainPoint[] = (() => {
   const points: TerrainPoint[] = [];
   const baseLat = 39.85;

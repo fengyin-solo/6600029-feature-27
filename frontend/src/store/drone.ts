@@ -10,7 +10,9 @@ import {
   exportKML,
   mockNoFlyZones,
   mockTerrainData,
+  assessRouteRisk,
 } from '../utils/pathfinding';
+import type { RouteRisk } from '../utils/pathfinding';
 
 export const useDroneStore = defineStore('drone', () => {
   const waypoints = ref<Waypoint[]>([]);
@@ -53,11 +55,12 @@ export const useDroneStore = defineStore('drone', () => {
 
   function planRoute(start: [number, number], goal: [number, number]) {
     const bounds = { minLat: 39.85, maxLat: 39.95, minLng: 116.35, maxLng: 116.45 };
+    const safeDist = droneConfig.value.safeDistance;
     let raw: Waypoint[];
     if (selectedAlgorithm.value === 'astar') {
-      raw = aStarPathfind(start, goal, 30, noFlyZones.value, bounds);
+      raw = aStarPathfind(start, goal, 30, noFlyZones.value, bounds, safeDist);
     } else {
-      raw = rrtPathfind(start, goal, noFlyZones.value);
+      raw = rrtPathfind(start, goal, noFlyZones.value, 500, safeDist);
     }
     const smoothed = smoothPath(raw);
     waypoints.value = smoothed;
@@ -146,6 +149,15 @@ export const useDroneStore = defineStore('drone', () => {
     });
   });
 
+  const routeRisk = computed<RouteRisk>(() => {
+    return assessRouteRisk(
+      waypoints.value,
+      noFlyZones.value,
+      terrainData.value,
+      droneConfig.value.safeDistance
+    );
+  });
+
   return {
     waypoints,
     noFlyZones,
@@ -160,6 +172,7 @@ export const useDroneStore = defineStore('drone', () => {
     estimatedTime,
     batteryPercent,
     terrainProfile,
+    routeRisk,
     addWaypoint,
     removeWaypoint,
     updateWaypoint,

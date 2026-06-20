@@ -89,22 +89,22 @@ function drawRoute() {
 
   const latlngs = store.waypoints.map((w) => [w.lat, w.lng] as [number, number]);
 
-  // Check near obstacles for coloring
-  let hasDanger = false;
-  for (const wp of store.waypoints) {
-    for (const zone of store.noFlyZones) {
-      const d = Math.sqrt(
-        (wp.lat - zone.center[0]) ** 2 + (wp.lng - zone.center[1]) ** 2
-      ) * 111000;
-      if (d < zone.radius * 1.5) hasDanger = true;
-    }
+  const risk = store.routeRisk.overallRisk;
+  let color = '#22c55e';
+  let dashArray: string | undefined = undefined;
+  if (risk === 'warning') {
+    color = '#eab308';
+    dashArray = '6,4';
+  } else if (risk === 'danger') {
+    color = '#ef4444';
+    dashArray = '8,4';
   }
 
   routeLayer = L.polyline(latlngs, {
-    color: hasDanger ? '#ef4444' : '#22c55e',
+    color,
     weight: 3,
-    opacity: 0.8,
-    dashArray: hasDanger ? '8,4' : undefined,
+    opacity: 0.85,
+    dashArray,
   }).addTo(map);
 }
 
@@ -139,6 +139,7 @@ watch(() => store.waypoints.length, () => {
 
 watch(() => store.noFlyZones.length, drawNoFlyZones);
 watch(() => store.simProgress, drawSimDrone);
+watch(() => store.droneConfig.safeDistance, drawRoute);
 
 onMounted(() => {
   nextTick(initMap);

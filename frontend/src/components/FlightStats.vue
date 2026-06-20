@@ -15,6 +15,23 @@ function batteryColor(pct: number): string {
   return '#ef4444';
 }
 
+function riskColor(risk: string): string {
+  if (risk === 'safe') return '#22c55e';
+  if (risk === 'warning') return '#eab308';
+  return '#ef4444';
+}
+
+function riskLabel(risk: string): string {
+  if (risk === 'safe') return '安全';
+  if (risk === 'warning') return '警告';
+  return '危险';
+}
+
+function handleSafeDistanceChange(e: Event) {
+  const target = e.target as HTMLInputElement;
+  store.droneConfig.safeDistance = Number(target.value);
+}
+
 function handleExport() {
   const kml = store.exportPlan();
   if (!kml) return;
@@ -75,6 +92,72 @@ function handleExport() {
         <div class="text-slate-400">算法</div>
         <div class="text-lg font-bold text-purple-400 uppercase">
           {{ store.selectedAlgorithm }}
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-700 pt-2">
+      <h4 class="text-xs text-slate-400 mb-2">安全设置</h4>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-slate-400">安全距离</span>
+          <span class="font-bold text-sky-400">{{ store.droneConfig.safeDistance }}m</span>
+        </div>
+        <input
+          type="range"
+          min="10"
+          max="200"
+          step="5"
+          :value="store.droneConfig.safeDistance"
+          @input="handleSafeDistanceChange"
+          class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
+        />
+        <div class="flex justify-between text-[9px] text-slate-500">
+          <span>10m</span>
+          <span>200m</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="border-t border-slate-700 pt-2">
+      <h4 class="text-xs text-slate-400 mb-2">风险评估</h4>
+      <div class="bg-slate-900 rounded p-2 mb-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-slate-400">整体风险</span>
+          <span
+            class="text-xs font-bold px-2 py-0.5 rounded"
+            :style="{ backgroundColor: riskColor(store.routeRisk.overallRisk) + '20', color: riskColor(store.routeRisk.overallRisk) }"
+          >
+            {{ riskLabel(store.routeRisk.overallRisk) }}
+          </span>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 text-[10px]">
+        <div class="bg-slate-900 rounded p-2">
+          <div class="text-slate-500">距禁区最近</div>
+          <div class="text-sm font-bold text-slate-300">
+            {{ store.routeRisk.minDistanceToZone > 1000
+              ? (store.routeRisk.minDistanceToZone / 1000).toFixed(1) + ' km'
+              : store.routeRisk.minDistanceToZone.toFixed(0) + ' m' }}
+          </div>
+        </div>
+        <div class="bg-slate-900 rounded p-2">
+          <div class="text-slate-500">接近禁区点</div>
+          <div
+            class="text-sm font-bold"
+            :style="{ color: store.routeRisk.zoneRiskCount > 0 ? '#eab308' : '#22c55e' }"
+          >
+            {{ store.routeRisk.zoneRiskCount }}
+          </div>
+        </div>
+        <div class="bg-slate-900 rounded p-2 col-span-2">
+          <div class="text-slate-500">地形风险点</div>
+          <div
+            class="text-sm font-bold"
+            :style="{ color: store.routeRisk.terrainRiskCount > 0 ? '#eab308' : '#22c55e' }"
+          >
+            {{ store.routeRisk.terrainRiskCount }} 个航点低于安全高度
+          </div>
         </div>
       </div>
     </div>
